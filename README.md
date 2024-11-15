@@ -1,0 +1,5 @@
+- support multiple sources (remote, local)
+- multithread, lookahead
+- custom parse type
+- interactive filter
+- support stream
