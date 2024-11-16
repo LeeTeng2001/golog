@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/logviewer/v2/src/pkg/app"
+	"github.com/logviewer/v2/src/pkg/common"
 	"github.com/logviewer/v2/src/pkg/parser"
 	"github.com/logviewer/v2/src/pkg/source"
 	"github.com/spf13/cobra"
@@ -12,14 +14,24 @@ import (
 
 var (
 	// source cfg
-	cliSourceType string
-	cliSourcePath string
+	cliDebugOutput string
+	cliSourceType  string
+	cliSourcePath  string
 	// parser cfg
 	cliParserType string
 	// app cfg
 )
 
+var rootCmd = &cobra.Command{
+	Use:   "logviewer",
+	Short: "Logviewer is a fast & interactive structured log viewer",
+	RunE:  execute,
+}
+
 func execute(cmd *cobra.Command, args []string) error {
+	// init log
+	common.ConfigureGlobalLog(cliDebugOutput)
+
 	// init source
 	rd := source.AllReaders[cliSourceType]
 	if rd == nil {
@@ -38,20 +50,12 @@ func execute(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to init parser: %w", err)
 	}
 
-	ps.GetLogs(0, 10)
-
 	// run application
-	// return app.Main(ps)
-	return nil
-}
-
-var rootCmd = &cobra.Command{
-	Use:   "logviewer",
-	Short: "Logviewer is a fast & interactive structured log viewer",
-	RunE:  execute,
+	return app.Main(ps)
 }
 
 func main() {
+	rootCmd.Flags().StringVarP(&cliDebugOutput, "debug", "", "", "debug output")
 	rootCmd.Flags().StringVarP(&cliSourceType, "source", "s", "file", "source type [file]")
 	rootCmd.Flags().StringVarP(&cliSourcePath, "from", "f", "", "source input")
 	rootCmd.MarkFlagRequired("from")

@@ -114,7 +114,6 @@ func Main(ps parser.Parse) error {
 	// Initialize a global zone manager, so we don't have to pass around the manager
 	// throughout components.
 	zone.NewGlobal()
-	initTeaDebug()
 
 	m := &model{
 		tabs: &tabs{

@@ -2,13 +2,14 @@ package parser
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 	"time"
 
 	"github.com/logviewer/v2/src/pkg/common"
+	"github.com/logviewer/v2/src/pkg/common/slogx"
 	"github.com/logviewer/v2/src/pkg/source"
+	"github.com/mitchellh/mapstructure"
 	"github.com/samber/lo"
 )
 
@@ -42,17 +43,29 @@ func (z *Zap) GetLogs(offset int, maxAmt int) ([]LogItem, error) {
 
 	// might hit eof
 	for range linesToDecode {
-		item := logItem{}
-		if err := z.decoder.Decode(&item); err != nil {
-			fmt.Println("decode err", err)
+		item := zapLogItem{}
+		mp, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			DecodeHook: mapstructure.TextUnmarshallerHookFunc(),
+			Result:     &item,
+		})
+		if err != nil {
+			slogx.Error("create mapstructure error", err)
+			return nil, err
+		}
+
+		rawJsonMap := map[string]any{}
+		if err := z.decoder.Decode(&rawJsonMap); err != nil {
 			if err == io.EOF {
-				fmt.Println("EOF")
 				break
 			} else { // ignore invalid line?
+				slogx.Error("decode err", err)
 				continue
 			}
 		}
-		fmt.Printf("%v\n", item)
+		if err = mp.Decode(rawJsonMap); err != nil {
+			slogx.Error("decode map error", err)
+			return nil, err
+		}
 		z.logEntries = append(z.logEntries, &item)
 	}
 
@@ -62,22 +75,22 @@ func (z *Zap) GetLogs(offset int, maxAmt int) ([]LogItem, error) {
 	return z.logEntries[decodeFrom:min(len(z.logEntries), decodeTo)], nil
 }
 
-var _ LogItem = (*logItem)(nil)
+var _ LogItem = (*zapLogItem)(nil)
 
-type logItem struct {
-	Ts              common.TimeConverter   `json:"ts"`
-	Lv              string                 `json:"level"`
-	Call            string                 `json:"logger"`
-	Ms              string                 `json:"msg"`
-	Li              string                 `json:"caller"`
-	Other           map[string]interface{} `json:"-"`
+type zapLogItem struct {
+	Ts              common.TimeConverter   `mapstructure:"ts"`
+	Lv              string                 `mapstructure:"level"`
+	Call            string                 `mapstructure:"logger"`
+	Ms              string                 `mapstructure:"msg"`
+	Li              string                 `mapstructure:"caller"`
+	Other           map[string]interface{} `mapstructure:",remain"`
 	otherSerialised []lo.Tuple2[string, any]
 }
 
-func (l *logItem) TimeStamp() time.Time {
+func (l *zapLogItem) TimeStamp() time.Time {
 	return time.Time(l.Ts)
 }
-func (l *logItem) Level() LogLevel {
+func (l *zapLogItem) Level() LogLevel {
 	switch l.Lv {
 	case "trace":
 		return LogTrace
@@ -93,10 +106,10 @@ func (l *logItem) Level() LogLevel {
 		return LogUnknown
 	}
 }
-func (l *logItem) Caller() string { return l.Call }
-func (l *logItem) Msg() string    { return l.Ms }
-func (l *logItem) Line() string   { return l.Li }
-func (l *logItem) SortedFields() []lo.Tuple2[string, any] {
+func (l *zapLogItem) Caller() string { return l.Call }
+func (l *zapLogItem) Msg() string    { return l.Ms }
+func (l *zapLogItem) Line() string   { return l.Li }
+func (l *zapLogItem) SortedFields() []lo.Tuple2[string, any] {
 	// lazy serialisation
 	if l.otherSerialised == nil {
 		keys := lo.Keys(l.Other)

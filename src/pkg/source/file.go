@@ -12,6 +12,10 @@ type File struct {
 	file *os.File
 }
 
+func (f *File) OnlyStream() bool {
+	return false
+}
+
 func (f *File) Init(source string) error {
 	fh, err := os.Open(source)
 	if err != nil {

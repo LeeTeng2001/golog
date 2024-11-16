@@ -6,6 +6,7 @@ var AllReaders = map[string]Reader{}
 
 type Reader interface {
 	io.ReadSeeker
+	OnlyStream() bool
 	Init(source string) error
 }
 
