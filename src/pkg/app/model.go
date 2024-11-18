@@ -7,6 +7,7 @@ package app
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/logviewer/v2/src/pkg/parser"
 	zone "github.com/lrstanley/bubblezone"
 )
@@ -18,7 +19,6 @@ import (
 var (
 	subtle    = lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}
 	highlight = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
-	special   = lipgloss.AdaptiveColor{Light: "#43BF6D", Dark: "#73F59F"}
 )
 
 type model struct {
@@ -27,13 +27,8 @@ type model struct {
 	width  int
 
 	// components
-
 	tabs    tea.Model
 	logList tea.Model
-	// dialog  tea.Model
-	// list1   tea.Model
-	// list2   tea.Model
-	// history tea.Model
 }
 
 func (m model) Init() tea.Cmd {
@@ -75,7 +70,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) propagate(msg tea.Msg) tea.Model {
 	// Propagate to all children.
-	m.tabs, _ = m.tabs.Update(msg)
+	// m.tabs, _ = m.tabs.Update(msg)
 	m.logList, _ = m.logList.Update(msg)
 
 	// if msg, ok := msg.(tea.WindowSizeMsg); ok {
@@ -93,7 +88,7 @@ func (m model) View() string {
 		return "initialising..."
 	}
 
-	s := lipgloss.NewStyle().MaxHeight(m.height).MaxWidth(m.width).Padding(1, 2, 1, 2)
+	s := lipgloss.NewStyle().MaxHeight(m.height).MaxWidth(m.width)
 	return zone.Scan(s.Render(lipgloss.JoinVertical(lipgloss.Top,
 		// m.tabs.View(),
 		// "xxx",
@@ -115,55 +110,22 @@ func Main(ps parser.Parse) error {
 	// throughout components.
 	zone.NewGlobal()
 
+	l, err := lru.New[int, *logCache](512)
+	if err != nil {
+		return err
+	}
 	m := &model{
-		tabs: &tabs{
-			id:     zone.NewPrefix(), // Give each type an ID, so no zones will conflict.
-			height: 2,
-			active: "Lip Gloss",
-			items:  []string{"Lip Gloss", "Blush", "Eye Shadow", "Mascara"},
-		},
+		// tabs: &tabs{
+		// 	id:     zone.NewPrefix(), // Give each type an ID, so no zones will conflict.
+		// 	height: 2,
+		// 	active: "Lip Gloss",
+		// 	items:  []string{"Lip Gloss", "Blush", "Eye Shadow", "Mascara"},
+		// },
 		logList: &loglist{
-			id: zone.NewPrefix(),
-			ps: ps,
+			renderLru: l,
+			id:        zone.NewPrefix(),
+			ps:        ps,
 		},
-		// dialog: &dialog{
-		// 	id:       zone.NewPrefix(),
-		// 	height:   8,
-		// 	active:   "confirm",
-		// 	question: "Are you sure you want to eat marmalade?",
-		// },
-		// list1: &list{
-		// 	id:     zone.NewPrefix(),
-		// 	height: 8,
-		// 	title:  "Citrus Fruits to Try",
-		// 	items: []listItem{
-		// 		{name: "Grapefruit", done: true},
-		// 		{name: "Yuzu", done: false},
-		// 		{name: "Citron", done: false},
-		// 		{name: "Kumquat", done: true},
-		// 		{name: "Pomelo", done: false},
-		// 	},
-		// },
-		// list2: &list{
-		// 	id:     zone.NewPrefix(),
-		// 	height: 8,
-		// 	title:  "Actual Lip Gloss Vendors",
-		// 	items: []listItem{
-		// 		{name: "Glossier", done: true},
-		// 		{name: "Claire's Boutique", done: true},
-		// 		{name: "Nyx", done: false},
-		// 		{name: "Mac", done: false},
-		// 		{name: "Milk", done: false},
-		// 	},
-		// },
-		// history: &history{
-		// 	id: zone.NewPrefix(),
-		// 	items: []string{
-		// 		"The Romans learned from the Greeks that quinces slowly cooked with honey would “set” when cool. The Apicius gives a recipe for preserving whole quinces, stems and leaves attached, in a bath of honey diluted with defrutum: Roman marmalade. Preserves of quince and lemon appear (along with rose, apple, plum and pear) in the Book of ceremonies of the Byzantine Emperor Constantine VII Porphyrogennetos.",
-		// 		"Medieval quince preserves, which went by the French name cotignac, produced in a clear version and a fruit pulp version, began to lose their medieval seasoning of spices in the 16th century. In the 17th century, La Varenne provided recipes for both thick and clear cotignac.",
-		// 		"In 1524, Henry VIII, King of England, received a “box of marmalade” from Mr. Hull of Exeter. This was probably marmelada, a solid quince paste from Portugal, still made and sold in southern Europe today. It became a favourite treat of Anne Boleyn and her ladies in waiting.",
-		// 	},
-		// },
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())

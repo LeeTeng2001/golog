@@ -45,15 +45,19 @@ func (z *Zap) GetLogs(offset int, maxAmt int) ([]LogItem, error) {
 	for range linesToDecode {
 		item := zapLogItem{}
 		mp, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			DecodeHook: mapstructure.TextUnmarshallerHookFunc(),
-			Result:     &item,
+			DecodeHook: mapstructure.ComposeDecodeHookFunc(
+				mapstructure.TextUnmarshallerHookFunc(),
+				common.FloatUnmarshallerHookFunc(),
+			),
+			Result:           &item,
+			WeaklyTypedInput: true,
 		})
 		if err != nil {
 			slogx.Error("create mapstructure error", err)
 			return nil, err
 		}
 
-		rawJsonMap := map[string]any{}
+		rawJsonMap := map[string]interface{}{}
 		if err := z.decoder.Decode(&rawJsonMap); err != nil {
 			if err == io.EOF {
 				break
@@ -63,7 +67,7 @@ func (z *Zap) GetLogs(offset int, maxAmt int) ([]LogItem, error) {
 			}
 		}
 		if err = mp.Decode(rawJsonMap); err != nil {
-			slogx.Error("decode map error", err)
+			slogx.Error("mapstructure error", err)
 			return nil, err
 		}
 		z.logEntries = append(z.logEntries, &item)

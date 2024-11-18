@@ -11,6 +11,7 @@ var AllParser = map[string]Parse{}
 
 // support parsing structured log from some source
 // log field with the same name MUST have the same value type
+// TODO: hide field, support filtering key val
 type Parse interface {
 	Init(r source.Reader) error
 	GetLogs(offset, maxAmt int) ([]LogItem, error)
